@@ -423,8 +423,8 @@ FinderPatternFinder.prototype.haveMultiplyConfirmedCenters = function() {
   return totalDeviation <= 0.05 * totalModuleSize;
 };
 
-FinderPatternFinder.prototype.findFinderPattern = function(image) {
-  var tryHarder = false;
+FinderPatternFinder.prototype.findFinderPattern = function(image, fineSearch) {
+  var tryHarder = fineSearch || false;
   this.image = image;
   var maxI = image.height;
   var maxJ = image.width;

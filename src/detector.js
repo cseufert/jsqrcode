@@ -349,8 +349,8 @@ Detector.prototype.processFinderPatternInfo = function(info) {
   return new DetectorResult(bits, points);
 };
 
-Detector.prototype.detect = function() {
-  var info =  new FinderPatternFinder().findFinderPattern(this.image);
+Detector.prototype.detect = function(fineSearch) {
+  var info =  new FinderPatternFinder().findFinderPattern(this.image, fineSearch);
 
   return this.processFinderPatternInfo(info);
 };

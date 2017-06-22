@@ -28,12 +28,12 @@
 
         var upload = document.getElementById('upload');
         var preview = document.getElementById('preview');
-        var qr = new QrCode();
+        var qr = new QrCode({detectFine: true});
 
         qr.callback = function(err, result) {
           var span = document.querySelector('span') || document.createElement('span');
           if(result){
-            span.textContent = result;
+            span.textContent = JSON.stringify(result, null, 2);
           }
           else{
             span.textContent = 'Error! See error message in console!';

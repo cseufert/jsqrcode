@@ -20,13 +20,14 @@ import Decoder from './decoder';
 export var qrcode = {};
 qrcode.sizeOfDataLengthInfo =  [[10, 9, 8, 8], [12, 11, 16, 10], [14, 13, 16, 12]];
 
-export default function QrCode() {
-
+export default function QrCode(options) {
+  options = options || {};
   this.imagedata = null;
   this.width = 0;
   this.height = 0;
   this.qrCodeSymbol = null;
   this.debug = false;
+  this.detectFine = options.detectFine || false;
 
   this.callback = null;
 }
@@ -114,7 +115,7 @@ QrCode.prototype.process = function(imageData) {
 
   var detector = new Detector(image);
 
-  var qRCodeMatrix = detector.detect();
+  var qRCodeMatrix = detector.detect(this.detectFine);
 
   /*for (var y = 0; y < qRCodeMatrix.bits.height; y++)
    {
