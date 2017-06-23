@@ -31,7 +31,8 @@ export default class QrCode {
     this.qrCodeSymbol = null;
     this.debug = false;
     this.detectFine = options.detectFine || false;
-
+    this.QRCodePoints = {};
+    this.binariseMethod = '';
     this.callback = null;
   }
 
@@ -83,7 +84,7 @@ export default class QrCode {
       this.result = this.process();
     } catch (e) {
       this.error = e;
-      this.result = {points: this.QRCodePoints.points};
+      this.result = {points: this.QRCodePoints.points || []};
     }
 
     if (typeof this.callback === 'function') {
@@ -109,10 +110,11 @@ export default class QrCode {
   process() {
     const start = new Date().getTime();
 
-    const binariseOptions = [QrCode.binariseBradley, QrCode.binariseThreshold];
+    const binariseOptions = ['binariseBradley', 'binariseThreshold'];
     for (var binOpt = 0; binOpt < binariseOptions.length; binOpt++) {
       try {
-        this.binImage = binariseOptions[binOpt](this.imagedata);
+        this.binariseMethod = binariseOptions[binOpt];
+        this.binImage = QrCode[binariseOptions[binOpt]](this.imagedata);
         var detector = new Detector(this.binImage);
 
         this.QRCodePoints = detector.detect(this.detectFine);
@@ -134,7 +136,7 @@ export default class QrCode {
       console.log('QR Code processing time (ms): ' + time);
     }
 
-    return {result: this.decode_utf8(str), points: this.QRCodePoints.points};
+    return {result: this.decode_utf8(str), points: this.QRCodePoints.points, method: this.binariseMethod};
   }
 
   readData(reader) {
