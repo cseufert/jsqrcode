@@ -3,22 +3,35 @@
   <head>
     <title>QR Test</title>
     <style>
-      #preview img {
+      #dropArea {
+        margin:0.5em;
+        border: 2px solid grey;
+        text-align: center;
+        padding:1em;
+      }
+      #preview img, #results img {
         border: 1px solid black;
         float: left;
         margin: 0 1em 1em 0;
         width: 10em;
+        clear:left;
+      }
+      #results > div {
+        clear:left;
+      }
+      pre {
+        /*clear:left;*/
       }
     </style>
   </head>
   <body>
-    <h1>Simple browser demo using the FileReader API</h1>
-
-    <h2>Upload file</h2>
-    <input type="file" id="upload">
+  <div id="dropArea"><h2>Drop Files here to identify QR Codes</h2></div>
 
     <h2>Result</h2>
+    <div id="results"></div>
     <div id="preview"></div>
+    <h2>Upload file</h2>
+    <input type="file" id="upload">
 
     <script type="text/javascript" src="../../dist/index.js"></script>
 
@@ -28,10 +41,123 @@
 
         var upload = document.getElementById('upload');
         var preview = document.getElementById('preview');
+        var dropArea = document.getElementById('dropArea');
+        var results = document.getElementById('results');
+        dropArea.addEventListener('dragover', function(event) {
+          event.stopPropagation();
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
+          return false;
+        });
+        dropArea.addEventListener('dragend', function(event) {
+          event.stopPropagation();
+          event.preventDefault();
+          return false;
+        });
+
+        function decodeFile(file, filename) {
+          return new Promise((res, rej) => {
+            qr = new QrCode({detectFine: true});
+            var block = document.createElement('div');
+            var img = document.createElement('img');
+            block.appendChild(img);
+            var msg = document.createElement('pre');
+            block.appendChild(msg);
+
+            var img2 = document.createElement('img');
+            var canvas = document.createElement('canvas');
+            var context = canvas.getContext('2d');
+
+            qr.callback = function(err, result) {
+              if(!err) {
+                msg.textContent = JSON.stringify(result, null, 2);
+              } else {
+                msg.textContent = 'Error: ' + String(err) + '\n' +
+                  JSON.stringify(result, null, 2);
+                console.error(err);
+              }
+              if(result.points) {
+                result.points.forEach(p => {
+                  context.beginPath();
+                  context.strokeStyle = 'red';
+                  context.moveTo(p.x - 20, p.y);
+                  context.lineTo(p.x + 20, p.y);
+                  context.stroke();
+                  context.beginPath();
+                  context.strokeStyle = 'red';
+                  context.moveTo(p.x, p.y - 20);
+                  context.lineTo(p.x, p.y + 20);
+                  context.stroke();
+
+                })
+              }
+              res(true);
+            };
+            var imageType = /^image\//;
+
+            if (!imageType.test(file.type)) {
+              msg.textContent('Error: File type not valid');
+              res(false);
+            }
+
+            img2.onload = function() {
+
+
+              canvas.width = img2.width;
+              canvas.height = img2.height;
+              context.drawImage(img2, 0, 0);
+              var imageData = context.getImageData(0, 0, img2.width, img2.height);
+              qr.decodeImageData(imageData);
+
+//              var bwImage = computeAdaptiveThreshold(imageData, 0.95);
+//              context.putImageData(qr.binaryImage,0,0)
+
+//              var bw = qr.binaryImage;
+//              var bwPixels = bw.data;
+//              console.log(imageData, bwPixels);
+//              var bwRGB = imageData.data;
+//              for(var i = 0, n = bwRGB.length; i < n; i += 4) {
+//                bwRGB[i] = bwRGB[i+1] = bwRGB[i+2] = bwPixels[Math.floor(i/4)]?255:0;
+//              }
+//              context.putImageData(imageData,0,0);
+
+            };
+
+            // Read file
+            var reader = new FileReader();
+            reader.addEventListener('load', function() {
+              // Show as preview image
+              img.src = this.result;
+              img2.src = this.result;
+              // Analyse code
+//              qr.decode(this.result);
+            }.bind(reader), false);
+            reader.readAsDataURL(file);
+            results.appendChild(block);
+
+//            document.body.appendChild(canvas);
+
+          });
+        }
+
+        var lastDecode = Promise.resolve();
+        dropArea.addEventListener('drop', function(event) {
+          console.log("Dropped");
+          event.stopPropagation();
+          event.preventDefault();
+          var files = event.dataTransfer.files;
+          for(var i = 0, f; f = files[i]; i++)
+            (function(file) {
+              lastDecode = lastDecode.then(function() {
+                return decodeFile(file, file.name);
+              });
+            })(f)
+        });
+
         var qr = new QrCode({detectFine: true});
 
         qr.callback = function(err, result) {
-          var span = document.querySelector('span') || document.createElement('span');
+          var span = document.createElement('pre');
           if(result){
             span.textContent = JSON.stringify(result, null, 2);
           }
@@ -55,7 +181,7 @@
             var reader = new FileReader();
             reader.addEventListener('load', function() {
               // Show as preview image
-              var img = document.querySelector('img') || document.createElement('img');
+              var img = document.createElement('img');
               img.src = this.result;
               preview.appendChild(img);
 
@@ -65,6 +191,11 @@
             reader.readAsDataURL(file);
           }
         }, false);
+
+
+
+
+
       })();
     </script>
   </body>

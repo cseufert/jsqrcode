@@ -287,13 +287,14 @@ FinderPatternFinder.prototype.crossCheckHorizontal = function(startJ,  centerI, 
 
 FinderPatternFinder.prototype.handlePossibleCenter = function(stateCount,  i,  j) {
   var stateCountTotal = stateCount[0] + stateCount[1] + stateCount[2] + stateCount[3] + stateCount[4];
+  if (stateCountTotal <= 14) return false;
   var centerJ = this.centerFromEnd(stateCount, j); //float
   var centerI = this.crossCheckVertical(i, Math.floor(centerJ), stateCount[2], stateCountTotal); //float
   if (!isNaN(centerI)) {
     // Re-cross check
     centerJ = this.crossCheckHorizontal(Math.floor(centerJ), Math.floor(centerI), stateCount[2], stateCountTotal);
     if (!isNaN(centerJ)) {
-      var estimatedModuleSize =   stateCountTotal / 7.0;
+      var estimatedModuleSize = stateCountTotal / 7.0;
       var found = false;
       var max = this.possibleCenters.length;
       for (var index = 0; index < max; index++) {
@@ -329,35 +330,96 @@ FinderPatternFinder.prototype.selectBestPatterns = function() {
   // Filter outlier possibilities whose module size is too different
   if (startSize > 3) {
     // But we can only afford to do so if we have at least 4 possibilities to choose from
-    var totalModuleSize = 0.0;
-    var square = 0.0;
-    for (var i = 0; i < startSize; i++) {
-      var  centerValue = this.possibleCenters[i].estimatedModuleSize;
-      totalModuleSize += centerValue;
-      square += (centerValue * centerValue);
-    }
-    var average = totalModuleSize /  startSize;
-    this.possibleCenters.sort(function(center1, center2) {
-      var dA = Math.abs(center2.estimatedModuleSize - average);
-      var dB = Math.abs(center1.estimatedModuleSize - average);
-      if (dA < dB) {
-        return (-1);
-      } else if (dA == dB) {
-        return 0;
-      } else {
-        return 1;
-      }
-    });
-
-    var stdDev = Math.sqrt(square / startSize - average * average);
-    var limit = Math.max(0.2 * average, stdDev);
-    for (var i = this.possibleCenters - 1; i >= 0; i--) {
-      var pattern =  this.possibleCenters[i];
-      if (Math.abs(pattern.estimatedModuleSize - average) > limit) {
-        this.possibleCenters.splice(i, 1);
-      }
-    }
+    // var totalModuleSize = 0.0;
+    // var square = 0.0;
+    // for (var i = 0; i < startSize; i++) {
+    //   var  centerValue = this.possibleCenters[i].estimatedModuleSize;
+    //   totalModuleSize += centerValue;
+    //   square += (centerValue * centerValue);
+    // }
+    // var average = totalModuleSize /  startSize;
+    // this.possibleCenters.sort(function(center1, center2) {
+    //   var dA = Math.abs(center2.estimatedModuleSize - average);
+    //   var dB = Math.abs(center1.estimatedModuleSize - average);
+    //   if (dA < dB) {
+    //     return (-1);
+    //   } else if (dA == dB) {
+    //     return 0;
+    //   } else {
+    //     return 1;
+    //   }
+    // });
+    //
+    // var stdDev = Math.sqrt(square / startSize - average * average);
+    // var limit = Math.max(0.2 * average, stdDev);
+    // for (var i = this.possibleCenters - 1; i >= 0; i--) {
+    //   var pattern =  this.possibleCenters[i];
+    //   if (Math.abs(pattern.estimatedModuleSize - average) > limit) {
+    //     this.possibleCenters.splice(i, 1);
+    //   }
+    // }
   }
+
+  function testPointsAreTriangle(a, b, c, err) {
+    var v = [dist2d(a.x, a.y, b.x, b.y), dist2d(b.x, b.y, c.x, c.y),
+      dist2d(c.x, c.y, a.x, a.y)];
+    for (var i = 0; i < 3; i++) {
+      var err = Math.min(v[0], v[1], v[2]) * err;
+      // console.log(v, err, Math.abs(v[0] - v[1]), Math.abs(v[1] - (v[2] / 1.414)),
+      //   Math.abs((v[2] / 1.414) - v[0]));
+      if (Math.abs(v[0] - v[1]) < err && Math.abs(v[1] - (v[2] / 1.414)) < err &&
+          Math.abs((v[2] / 1.414) - v[0]) < err)
+        return true;
+      v.push(v.shift());
+    }
+    return false;
+  }
+
+
+  function findBestMatches(possibleCenters, err) {
+    var moduleSizeStdDev = [];
+    for (var i = 0; i < possibleCenters.length; i++) {
+      var a = possibleCenters[i];
+      for (var j = 0; j < i; j++) {
+        var b = possibleCenters[j];
+        for (var k = 0; k < j; k++) {
+          var c = possibleCenters[k];
+          if (testPointsAreTriangle(a, b, c, err)) {
+            var mean = (a.estimatedModuleSize + b.estimatedModuleSize + c.estimatedModuleSize) / 3;
+            var stdDev = (Math.pow(a.estimatedModuleSize - mean, 2) +
+              Math.pow(a.estimatedModuleSize - mean, 2) +
+              Math.pow(a.estimatedModuleSize - mean, 2)) / 3;
+            moduleSizeStdDev.push({a, b, c, mean, stdDev});
+          }
+        }
+      }
+    }
+    return moduleSizeStdDev;
+  }
+  var moduleSizeStdDev = [];
+  var err = 0.05;
+  while (err < 0.5 && moduleSizeStdDev.length == 0) {
+    err += 0.05;
+    moduleSizeStdDev = findBestMatches(this.possibleCenters, err);
+  }
+  if (moduleSizeStdDev.length < 1)
+    throw new Error("Unable to identify enough QR locator points");
+  moduleSizeStdDev.sort((a, b) => b.mean - a.mean); //Biggest First
+  console.warn(JSON.parse(JSON.stringify(moduleSizeStdDev)));
+
+  //moduleSizeStdDev.forEach(tri => centersGeomOk(tri.a, tri.b, tri.c));
+  var bestCenters = [moduleSizeStdDev[0].a, moduleSizeStdDev[0].b, moduleSizeStdDev[0].c];
+
+  bestCenters.sort(function(a, b) {
+    if (a.count > b.count) return -1;
+    if (a.count < b.count) return 1;
+    return 0;
+  });
+  console.warn(JSON.parse(JSON.stringify(bestCenters)));
+
+  console.warn(JSON.parse(JSON.stringify(bestCenters)));
+  return bestCenters;
+
 
   if (this.possibleCenters.length > 3) {
     // Throw away all but those first size candidate points we found.
@@ -370,6 +432,15 @@ FinderPatternFinder.prototype.selectBestPatterns = function() {
 
   return [this.possibleCenters[0],  this.possibleCenters[1],  this.possibleCenters[2]];
 };
+
+function dist2d(x1, y1, x2, y2) {
+  return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+}
+
+function stdDev(nums) {
+  var mean = nums.reduce((t, n) => t + n, 0) / nums.length;
+  return nums.map(n => (n - mean) * (n - mean)).reduce((t, n) => t + n, 0) / nums.length;
+}
 
 FinderPatternFinder.prototype.findRowSkip = function() {
   var max = this.possibleCenters.length;
@@ -524,7 +595,7 @@ FinderPatternFinder.prototype.findFinderPattern = function(image, fineSearch) {
       }
     }
   }
-
+  console.warn(JSON.parse(JSON.stringify(this.possibleCenters)));
   var patternInfo = this.selectBestPatterns();
   orderBestPatterns(patternInfo);
 
