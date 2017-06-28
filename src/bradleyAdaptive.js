@@ -35,8 +35,8 @@ export function computeAdaptiveThreshold(sourceImageData, ratio, callback) {
 }
 
 export function createImageData(width, height) {
-  var canvas = document.createElement('canvas');
-  return canvas.getContext('2d').createImageData(width, height);
+  return {width, height, data:new Uint8ClampedArray(4 * width * height)};
+
 }
 
 export function binariseOutput(input) {
